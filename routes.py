@@ -314,3 +314,4 @@ def vote(poste):
     candidats = Candidature.query.filter_by(poste=poste).all()
     return render_template('vote.html', poste=poste, phase=phase, candidats=candidats, poste_texte=config.POSTES[poste])
 
+
