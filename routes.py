@@ -238,7 +238,7 @@ def resultats():
     return render_template("resultats.html", phase=phase, POSTES=POSTES, resultats=resultats)
 
 
-from flask import request, redirect, url_for, flash, render_template
+from flask import request, redirect, url_for, flash, render_template, make_response
 from datetime import datetime
 
 @router.route('/vote/<poste>', methods=['GET', 'POST'])
@@ -246,6 +246,7 @@ def vote(poste):
     now = datetime.now()
     phase = get_phase(now)
 
+    # Vérification si le poste est valide
     if poste not in config.POSTES:
         flash("Poste invalide.", 'error')
         return redirect(url_for('templates.home'))
@@ -258,41 +259,48 @@ def vote(poste):
             flash("Veuillez remplir tous les champs.", 'error')
             return redirect(url_for('templates.vote', poste=poste))
 
-        # Récupérer les informations de l'appareil
+        # Informations de l'appareil (User-Agent et IP)
         user_agent = request.headers.get('User-Agent', 'Inconnu')
         ip_address = request.remote_addr
 
-        # Vérifier si un fingerprint existe déjà pour cet appareil
+        # Vérifier si un fingerprint existe pour cet appareil
         fingerprint = Fingerprint.query.filter_by(user_agent=user_agent, ip_address=ip_address).first()
-
         if not fingerprint:
             fingerprint = Fingerprint(user_agent=user_agent, ip_address=ip_address)
             db.session.add(fingerprint)
             db.session.commit()
 
-        # Vérification cohérence du matricule entre Local Storage et l'entrée utilisateur
+        # Récupérer le matricule depuis le Local Storage (via cookie ici)
         stored_matricule = request.cookies.get('matricule')
+        
         if stored_matricule and stored_matricule != matricule:
             flash(f"Cet appareil est déjà lié au matricule {stored_matricule}.", 'error')
             return redirect(url_for('templates.vote', poste=poste))
 
-        # Créer un nouveau client si nécessaire
-        client = Client.query.filter_by(matricule=matricule).first()
-        if client:
-            flash("Ce matricule a déjà été utilisé.", 'warning')
+        # Vérifier si ce matricule a déjà voté pour ce poste spécifique
+        existing_vote = Vote.query.join(Client).filter(
+            Client.matricule == matricule,
+            Vote.poste == poste
+        ).first()
+
+        if existing_vote:
+            flash(f"Le matricule {matricule} a déjà voté pour le poste {poste}.", 'warning')
             return redirect(url_for('templates.vote', poste=poste))
 
+        # Si le matricule est valide, enregistrer le vote
         try:
-            new_client = Client(candidature_id=candidat_id, fingerprint_id=fingerprint.id, matricule=matricule)
-            db.session.add(new_client)
-            db.session.commit()
+            client = Client.query.filter_by(matricule=matricule).first()
+            if not client:
+                client = Client(matricule=matricule, fingerprint_id=fingerprint.id)
+                db.session.add(client)
+                db.session.commit()
 
-            nouveau_vote = Vote(poste=poste, candidat_id=candidat_id, client_id=new_client.id)
+            nouveau_vote = Vote(poste=poste, candidat_id=candidat_id, client_id=client.id)
             db.session.add(nouveau_vote)
             db.session.commit()
 
-            # Stocker le matricule dans un cookie/Local Storage via le JavaScript
-            response = redirect(url_for('templates.home'))
+            # Stocker le matricule dans un cookie pour utilisation future
+            response = make_response(redirect(url_for('templates.home')))
             response.set_cookie('matricule', matricule)
 
             flash("Votre vote a été enregistré avec succès!", 'success')
@@ -302,5 +310,7 @@ def vote(poste):
             db.session.rollback()
             flash("Une erreur est survenue lors de l'enregistrement du vote.", 'error')
 
+    # Afficher les candidats disponibles pour le poste
     candidats = Candidature.query.filter_by(poste=poste).all()
     return render_template('vote.html', poste=poste, phase=phase, candidats=candidats, poste_texte=config.POSTES[poste])
+

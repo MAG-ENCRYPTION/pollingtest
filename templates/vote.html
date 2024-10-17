@@ -13,7 +13,6 @@
     d'actions ou lire les visions afin de vous faire une idée sur les différents candidats.
 </p>
 <br>
-
 {% endif %}
 
 {% if candidats %}
@@ -50,23 +49,6 @@
                     <label for="candidat_{{ candidat.id }}">
                         <h5 class="card-title mt-2">{{ candidat.nom }}</h5>
                     </label>
-                    {% if poste == 'president' %}
-                    {% if candidat.programme %}
-                    <a href="{{ url_for('uploaded_file', filename=candidat.programme) }}"
-                        class="btn btn-outline-info btn-sm" download>
-                        Télécharger le programme <i class="fas fa-download ml-1"></i>
-                    </a>
-                    {% else %}
-                    <p class="text-muted">Programme non disponible</p>
-                    {% endif %}
-                    {% else %}
-                    <br/>
-                    <br/>
-                    <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal"
-                        data-bs-target="#modal-{{ candidat.id }}">
-                        Voir les détails
-                    </button>
-                    {% endif %}
                 </div>
             </div>
         </div>
@@ -88,9 +70,8 @@
                         <i class="fas fa-user-circle fa-3x text-primary"></i>
                         {% endif %}
                         <h5 class="mt-2">{{ candidat.nom }}</h5>
-                        <br><br>
                         <p class="text-justify" style="text-align: justify !important;"
-                            id="modal-desc-{{ candidat.id }}"></p> <!-- Contenu du modal -->
+                            id="modal-desc-{{ candidat.id }}"></p>
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fermer</button>
@@ -107,15 +88,14 @@
                 const description = {{ candidat.description | tojson | safe }};
                 const htmlContent = marked.parse(description.replace(/^[\u200B\u200C\u200D\u200E\u200F\uFEFF]/, ""));
                 const modal = document.getElementById('modal-{{ candidat.id }}');
-                const desc = document.getElementById('desc-{{ candidat.id }}');
                 modal.addEventListener('show.bs.modal', function () {
-                    document.getElementById('modal-desc-{{ candidat.id }}').innerHTML = htmlContent; // Mettre à jour le contenu du modal
+                    document.getElementById('modal-desc-{{ candidat.id }}').innerHTML = htmlContent;
                 });
             });
         </script>
         {% endfor %}
     </div>
-    
+
     <!-- Bouton de soumission -->
     <div class="text-center mt-4">
         <button type="submit" class="btn btn-primary">Voter</button>
@@ -125,7 +105,6 @@
 <script>
     let selectedCandidateId = -1;
 
-    // Fonction pour sélectionner un candidat
     function selectCandidate(id) {
         const card = document.getElementById(`card-${id}`);
         const oldCard = document.getElementById(`card-${selectedCandidateId}`);
@@ -143,21 +122,36 @@
         card.classList.add("selected-card");
     }
 
-    // Vérification du matricule avec Local Storage
     document.getElementById('vote-form').addEventListener('submit', function (e) {
         const matriculeInput = document.getElementById('matricule');
-        const storedMatricule = localStorage.getItem('matricule');
-
+        const storedMatricules = JSON.parse(localStorage.getItem('matricules') || '[]');
         const enteredMatricule = matriculeInput.value.trim().toUpperCase();
-        
-        if (storedMatricule && storedMatricule !== enteredMatricule) {
+
+        if (!storedMatricules.includes(enteredMatricule)) {
+            storedMatricules.push(enteredMatricule);
+            localStorage.setItem('matricules', JSON.stringify(storedMatricules));
+        } else {
+            alert(`Le matricule ${enteredMatricule} a déjà été utilisé pour voter.`);
             e.preventDefault();
-            alert(`Cet appareil est déjà lié au matricule ${storedMatricule}.`);
-        } else if (!storedMatricule) {
-            localStorage.setItem('matricule', enteredMatricule);
         }
     });
+
+        document.addEventListener('DOMContentLoaded', function () {
+        const form = document.querySelector('form');
+        form.addEventListener('submit', function (event) {
+            const matricule = document.getElementById('matricule').value;
+            const storedMatricule = localStorage.getItem('matricule');
+
+            if (storedMatricule && storedMatricule !== matricule) {
+                alert(`Cet appareil est déjà associé au matricule ${storedMatricule}.`);
+                event.preventDefault();  // Empêche l'envoi du formulaire
+            } else {
+                localStorage.setItem('matricule', matricule);  // Stocke le matricule
+            }
+        });
+    });
 </script>
+
 
 {% else %}
 <p>Aucun candidat n'est actuellement enregistré pour ce poste.</p>
