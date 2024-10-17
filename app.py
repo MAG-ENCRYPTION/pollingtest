@@ -32,4 +32,4 @@ if __name__ == '__main__':
         _logger.warning("Directory for uploads not existing")
         os.makedirs(UPLOAD_FOLDER)
         _logger.info("Directory for uploads created")
-    app.run(debug=True,port=80, host='0.0.0.0')
+    app.run(debug=True,port=5000, host='0.0.0.0')
